@@ -12,20 +12,38 @@ class ServiceErrors:
     first_error_time: str
 
 
-def summarize(rows: list[dict[str, str]]) -> list[ServiceErrors]:
-    summaries: dict[str, ServiceErrors] = {}
+@dataclass
+class OutageSummary:
+    outage_id: str
+    services: list[ServiceErrors]
+
+    @property
+    def total(self) -> int:
+        return sum(item.error_count for item in self.services)
+
+
+def summarize(rows: list[dict[str, str]]) -> list[OutageSummary]:
+    grouped: dict[str, dict[str, ServiceErrors]] = {}
     for row in rows:
         if row["severity"].strip().upper() not in ERROR_SEVERITIES:
             continue
+        outage_id = row["outage_id"].strip()
         service = row["service"].strip()
         timestamp = row["timestamp"].strip()
-        current = summaries.get(service)
+        services = grouped.setdefault(outage_id, {})
+        current = services.get(service)
         if current is None:
-            summaries[service] = ServiceErrors(service, 1, timestamp)
+            services[service] = ServiceErrors(service, 1, timestamp)
             continue
         current.error_count += 1
         current.first_error_time = min(current.first_error_time, timestamp)
-    return sorted(summaries.values(), key=lambda item: (item.first_error_time, item.service))
+    return [
+        OutageSummary(
+            outage_id,
+            sorted(services.values(), key=lambda item: (item.first_error_time, item.service)),
+        )
+        for outage_id, services in sorted(grouped.items())
+    ]
 
 
 def read_logs(path: Path) -> list[dict[str, str]]:
@@ -33,10 +51,21 @@ def read_logs(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def write_summary(path: Path, summaries: list[ServiceErrors]) -> None:
+def render_markdown(summaries: list[OutageSummary]) -> str:
+    lines = ["# Outage Error Summaries", ""]
+    for outage in summaries:
+        lines += [
+            f"## {outage.outage_id}",
+            "",
+            "| # | service | error_count | first_error_time |",
+            "|---|---|---|---|",
+        ]
+        for index, item in enumerate(outage.services, start=1):
+            lines.append(f"| {index} | {item.service} | {item.error_count} | {item.first_error_time} |")
+        lines += ["", f"Total: {outage.total}", ""]
+    return "\n".join(lines)
+
+
+def write_markdown(path: Path, summaries: list[OutageSummary]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.writer(handle)
-        writer.writerow(["service", "error_count", "first_error_time"])
-        for item in summaries:
-            writer.writerow([item.service, item.error_count, item.first_error_time])
+    path.write_text(render_markdown(summaries), encoding="utf-8")

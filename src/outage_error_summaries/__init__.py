@@ -1,10 +1,10 @@
 import argparse
 from pathlib import Path
 
-from outage_error_summaries.summary import read_logs, summarize, write_summary
+from outage_error_summaries.summary import read_logs, summarize, write_markdown
 
 DEFAULT_INPUT = Path("data/replayed_outage_error_logs.csv")
-DEFAULT_OUTPUT = Path("output/service_error_counts.csv")
+DEFAULT_OUTPUT = Path("output/outage_summaries.md")
 
 
 def main() -> None:
@@ -14,8 +14,7 @@ def main() -> None:
     args = parser.parse_args()
 
     summaries = summarize(read_logs(args.input))
-    write_summary(args.output, summaries)
+    write_markdown(args.output, summaries)
 
-    for item in summaries:
-        print(f"{item.service}\t{item.error_count}\t{item.first_error_time}")
-    print(f"total\t{sum(item.error_count for item in summaries)}")
+    for outage in summaries:
+        print(f"{outage.outage_id}\t{len(outage.services)} services\t{outage.total} errors")
