@@ -1,0 +1,17 @@
+[project]
+name = "outage-error-summaries"
+version = "0.1.0"
+description = "Count ERROR and FATAL log lines per service, ordered by first error time"
+readme = "README.md"
+authors = [
+    { name = "furkankok", email = "furkankoksaldi28@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+outage-error-summaries = "outage_error_summaries:main"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
